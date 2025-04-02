@@ -122,3 +122,16 @@ in the online documentation for an overview on how to configure Spark.
 
 Please review the [Contribution to Spark guide](https://spark.apache.org/contributing.html)
 for information on how to get started contributing to the project.
+
+## 本地编译错误
+```
+    [WARNING] Rule 0: org.apache.maven.plugins.enforcer.RequireMavenVersion failed with message:
+Rule 0: org.apache.maven.plugins.enforcer.RequireMavenVersion failed with messag
+```
+ 解决方法：替换maven为 3.8.6
+## 在windows下用maven编译出现maven本身执行的错误。
+## 更换JDK版本为1.8
+    
+需要删除maven lib下面的 jansi-2.4.0.jar
+## 本地编译跳过检查和测试
+install -DskipTests=true -Dscalastyle.skip=true -Dcheckstyle.skip=true -f pom.xml
