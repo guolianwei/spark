@@ -134,4 +134,10 @@ Rule 0: org.apache.maven.plugins.enforcer.RequireMavenVersion failed with messag
     
 需要删除maven lib下面的 jansi-2.4.0.jar
 ## 本地编译跳过检查和测试
+```shell
 install -DskipTests=true -Dscalastyle.skip=true -Dcheckstyle.skip=true -f pom.xml
+```
+
+## 本地执行JavaMDJdbcSqlDataSourceExample样例需要配置的参数。
+* -Dspark.master=local[*] -Djava.library.path=D:\hadoopEcoKylin4Spark3\hadoop-3.3.4\bin  
+* 将带有provided范围的依赖项添加到类路径
