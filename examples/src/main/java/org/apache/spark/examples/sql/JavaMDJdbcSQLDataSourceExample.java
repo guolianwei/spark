@@ -75,6 +75,17 @@ public class JavaMDJdbcSQLDataSourceExample {
       .load();
     jdbcDF.show();
 
+    String driverPlugin1="hdfs://nn1:8020/user/hdfs/mon_plugins/mysql-8.0/";
+    Dataset<Row> jdbcDF1 = spark.read()
+            .format("mdjdbc")
+            .option("url", "jdbc:mysql://192.168.153.130:3306")
+            .option("dbtable", "hive.tbls")
+            .option("user", "root")
+            .option("password", "Root@123")
+            .option("driver_plugins", driverPlugin1)
+            .load();
+    jdbcDF1.show();
+
     Properties connectionProperties = new Properties();
     connectionProperties.put("user", "root");
     connectionProperties.put("password", "Root@123");
