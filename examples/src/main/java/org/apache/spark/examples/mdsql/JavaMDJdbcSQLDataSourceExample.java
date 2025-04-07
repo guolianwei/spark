@@ -14,7 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.spark.examples.sql;
+package org.apache.spark.examples.mdsql;
 
 // $example on:schema_merging$
 import java.io.Serializable;
@@ -94,22 +94,5 @@ public class JavaMDJdbcSQLDataSourceExample {
       .jdbc("jdbc:mysql:192.168.153.130:3306", "hive.tbls", connectionProperties);
     jdbcDF2.show();
 
-    // Saving data to a JDBC source
-    jdbcDF.write()
-      .format("mdjdbc")
-      .option("url", "jdbc:postgresql:dbserver")
-      .option("dbtable", "schema.tablename")
-      .option("user", "username")
-      .option("password", "password")
-      .save();
-
-    jdbcDF2.write()
-      .jdbc("jdbc:postgresql:dbserver", "schema.tablename", connectionProperties);
-
-    // Specifying create table column data types on write
-    jdbcDF.write()
-      .option("createTableColumnTypes", "name CHAR(64), comments VARCHAR(1024)")
-      .jdbc("jdbc:postgresql:dbserver", "schema.tablename", connectionProperties);
-    // $example off:jdbc_dataset$
   }
 }

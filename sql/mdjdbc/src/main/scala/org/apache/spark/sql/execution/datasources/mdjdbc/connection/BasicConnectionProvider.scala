@@ -18,7 +18,7 @@
 package org.apache.spark.sql.execution.datasources.mdjdbc.connection
 
 import org.apache.spark.internal.Logging
-import org.apache.spark.sql.execution.datasources.jdbc.JDBCOptions
+import org.apache.spark.sql.execution.datasources.mdjdbc.JDBCOptions
 import org.apache.spark.sql.mdjdbc.JdbcConnectionProvider
 
 import java.sql.{Connection, Driver}

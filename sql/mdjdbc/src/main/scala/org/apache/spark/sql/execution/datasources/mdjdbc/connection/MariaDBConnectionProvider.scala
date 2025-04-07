@@ -19,7 +19,7 @@ package org.apache.spark.sql.execution.datasources.mdjdbc.connection
 
 import java.sql.Driver
 
-import org.apache.spark.sql.execution.datasources.jdbc.JDBCOptions
+import org.apache.spark.sql.execution.datasources.mdjdbc.JDBCOptions
 
 private[mdjdbc] class MariaDBConnectionProvider extends SecureConnectionProvider {
   override val driverClass = "org.mariadb.jdbc.Driver"

@@ -23,7 +23,7 @@ import javax.security.auth.login.{AppConfigurationEntry, Configuration}
 import scala.collection.JavaConverters._
 
 import org.apache.spark.internal.Logging
-import org.apache.spark.sql.execution.datasources.jdbc.JDBCOptions
+import org.apache.spark.sql.execution.datasources.mdjdbc.JDBCOptions
 import org.apache.spark.util.SecurityUtils
 
 private[mdjdbc] abstract class SecureConnectionProvider extends BasicConnectionProvider with Logging {

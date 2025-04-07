@@ -25,9 +25,9 @@ import scala.collection.mutable
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.security.SecurityConfigurationLock
-import org.apache.spark.sql.execution.datasources.jdbc.JDBCOptions
+import org.apache.spark.sql.execution.datasources.mdjdbc.JDBCOptions
 import org.apache.spark.sql.internal.SQLConf
-import org.apache.spark.sql.jdbc.JdbcConnectionProvider
+import org.apache.spark.sql.mdjdbc.JdbcConnectionProvider
 import org.apache.spark.util.Utils
 
 protected abstract class ConnectionProviderBase extends Logging {

@@ -20,7 +20,7 @@ package org.apache.spark.sql.execution.datasources.mdjdbc.connection
 import java.sql.Driver
 import java.util.Properties
 
-import org.apache.spark.sql.execution.datasources.jdbc.JDBCOptions
+import org.apache.spark.sql.execution.datasources.mdjdbc.JDBCOptions
 
 private[mdjdbc] class PostgresConnectionProvider extends SecureConnectionProvider {
   override val driverClass = "org.postgresql.Driver"

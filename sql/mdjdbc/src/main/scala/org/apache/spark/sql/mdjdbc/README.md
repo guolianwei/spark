@@ -31,7 +31,7 @@ which can be a more secure alternative.
 
 Spark provides two ways to deal with stronger authentication:
 * Built-in CPs added which support kerberos authentication using `keytab` and `principal` (but only if the JDBC driver supports keytab)
-* `org.apache.spark.sql.jdbc.JdbcConnectionProvider` developer API added which allows developers
+* `org.apache.spark.sql.mdjdbc.JdbcConnectionProvider` developer API added which allows developers
   to implement any kind of database/use-case specific authentication method.
 
 ## How JDBC connection providers loaded?
@@ -79,7 +79,7 @@ Spark provides an example CP in the examples project (which does nothing).
 There are basically 2 files:
 * `examples/src/main/scala/org/apache/spark/examples/sql/jdbc/ExampleJdbcConnectionProvider.scala`
   which contains the main logic that can be further developed.
-* `examples/src/main/resources/META-INF/services/org.apache.spark.sql.jdbc.JdbcConnectionProvider`
+* `examples/src/main/resources/META-INF/services/org.apache.spark.sql.mdjdbc.JdbcConnectionProvider`
   which manifest file is used by service loader (this tells `Spark` that this CP needs to be loaded).
 
 Implementation considerations:

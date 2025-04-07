@@ -84,18 +84,20 @@ public class DriverUtils {
         if (monPluginFileValue == null || monPluginFileValue.isEmpty()) {
             throw new IllegalArgumentException(" file path cannot be null or empty");
         }
+        // 1. 判断缓存中是否已经存在该驱动类加载器
+        URLClassLoader urlClassLoader = classLoaderMap.get(monPluginFileValue);
+        if (urlClassLoader != null) {
+            LOG.info("使用已缓存的类加载器； key: " + monPluginFileValue);
+            return urlClassLoader;
+        }
+        //2. 判断文件路径是否为hdfs路径，如果是，则从hdfs下载zip文件到本地临时目录，并返回本地路径
         List<File> jarFiles;
-        if (isAZip(monPluginFileValue)) {
+        if (isALocalZip(monPluginFileValue)) {
             jarFiles = loadJarFilesFormZip(monPluginFileValue);
         } else {
             jarFiles = loadJarFilesFromFolder(monPluginFileValue);
         }
         // 3. 构建自定义类加载器
-        URLClassLoader urlClassLoader = classLoaderMap.get(monPluginFileValue);
-        if (urlClassLoader != null) {
-            LOG.info("从缓存中获取驱动类加载器,key:" + monPluginFileValue);
-            return urlClassLoader;
-        }
         URLClassLoader classLoader = createClassLoader(jarFiles);
         classLoaderMap.put(monPluginFileValue, classLoader);
         LOG.info("构建驱动类加载器,并写入缓存,key:" + monPluginFileValue);
@@ -103,15 +105,24 @@ public class DriverUtils {
     }
 
     /**
-     * 判断给定的文件路径是否指向一个有效的zip文件。
+     * 判断给定的文件路径是否指向一个有效的本地zip文件。
      * <p>
      * 该函数会检查文件是否存在、是否为目录、是否为常规文件，并且文件扩展名是否为".zip"。
      *
      * @param monPluginFileValue 文件路径字符串，表示需要检查的文件
      * @return 如果文件存在、是常规文件、不是目录，并且以".zip"结尾，则返回true；否则返回false
      */
-    private static boolean isAZip(String monPluginFileValue) throws URISyntaxException {
+    private static boolean isALocalZip(String monPluginFileValue) throws URISyntaxException {
         String suffix = ".zip";
+        boolean b = monPluginFileValue.endsWith(suffix);
+        if (!b) {
+            LOG.info("文件不是zip文件:" + monPluginFileValue);
+            return false;
+        }
+        if (monPluginFileValue.startsWith("hdfs://") || monPluginFileValue.startsWith("obs://")) {
+            LOG.info("文件不是本地文件:" + monPluginFileValue);
+            return false;
+        }
         String cleanPath = monPluginFileValue.replaceFirst("^file:///", "");
         java.nio.file.Path path = Paths.get(cleanPath);
         boolean exists = Files.exists(path);
@@ -129,10 +140,7 @@ public class DriverUtils {
             LOG.info("文件不是常规文件，不是zip文件:" + monPluginFileValue);
             return false;
         }
-        boolean b = monPluginFileValue.endsWith(suffix);
-        if (!b) {
-            LOG.info("文件不是zip文件:" + monPluginFileValue);
-        }
+
         return b;
     }
 
@@ -148,7 +156,7 @@ public class DriverUtils {
      */
     private static List<File> loadJarFilesFormZip(String zipFileValue) throws URISyntaxException, IOException {
         // 1. 获取ZIP文件路径（基于网页5的Spark文件分发机制）
-        if (!isAZip(zipFileValue)) {
+        if (!isALocalZip(zipFileValue)) {
             throw new IllegalArgumentException("Invalid ZIP file name: " + zipFileValue);
         }
         String zipPath = null;
@@ -400,7 +408,7 @@ public class DriverUtils {
     public static java.util.Enumeration<Driver> getDrivers(JDBCOptions jdbcOptions) throws Exception {
         String zipFilePath = jdbcOptions.parameters().get(DRIVER_ZIP_FILE_PATH_PARAM_NAME).get();
         if (zipFilePath != null) {
-            LOG.info("");
+            LOG.info("meritdata::getDrivers:: 加载驱动器插件：" + zipFilePath);
             URLClassLoader classLoader = getUrlClassLoader(zipFilePath);
             ClassLoader originalLoader = Thread.currentThread().getContextClassLoader();
             try {

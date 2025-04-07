@@ -23,7 +23,7 @@ import java.util.Properties
 
 import org.apache.hadoop.security.UserGroupInformation
 
-import org.apache.spark.sql.execution.datasources.jdbc.JDBCOptions
+import org.apache.spark.sql.execution.datasources.mdjdbc.JDBCOptions
 
 private[sql] class OracleConnectionProvider extends SecureConnectionProvider {
   override val driverClass = "oracle.jdbc.OracleDriver"

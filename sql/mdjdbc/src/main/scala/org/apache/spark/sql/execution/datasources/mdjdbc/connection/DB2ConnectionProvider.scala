@@ -23,7 +23,7 @@ import java.util.Properties
 
 import org.apache.hadoop.security.UserGroupInformation
 
-import org.apache.spark.sql.execution.datasources.jdbc.JDBCOptions
+import org.apache.spark.sql.execution.datasources.mdjdbc.JDBCOptions
 
 private[sql] class DB2ConnectionProvider extends SecureConnectionProvider {
   override val driverClass = "com.ibm.db2.jcc.DB2Driver"
