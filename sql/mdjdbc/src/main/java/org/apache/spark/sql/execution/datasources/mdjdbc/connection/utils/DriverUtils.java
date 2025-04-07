@@ -33,8 +33,9 @@ public class DriverUtils {
     public static final String DRIVER_ZIP_FILE_PATH_PARAM_NAME = "driver_plugins";
     public static final String MERITDATA_MON_SPARK_DRIVERS = "meritdata_mon_spark_drivers_";
     private static ConcurrentMap<String, URLClassLoader> classLoaderMap = new ConcurrentHashMap<>();
+
     static {
-        // 注册关闭钩子
+        // 注册关闭钩子，避免进程停止时无法删除本地的临时jar文件。
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             LOG.info("Shutting down DriverUtils and cleaning up class loaders...");
             classLoaderMap.forEach((key, classLoader) -> {
@@ -55,18 +56,15 @@ public class DriverUtils {
     // 其他方法保持不变...
 
 
-
     //"com.mysql.cj.jdbc.Driver"
-    public static Driver loadDriverFromPath(String url, String filePath)
-            throws Exception {
+    public static Driver loadDriverFromPath(String url, String filePath) throws Exception {
         URLClassLoader classLoader = getUrlClassLoader(filePath);
         // 4. 加载驱动类
         String driverClassName = DriverUtils.getDriverClassName(url);
         return initializeDriver(url, classLoader, driverClassName);
     }
 
-    public static Driver loadDriverFromPath(JDBCOptions options)
-            throws Exception {
+    public static Driver loadDriverFromPath(JDBCOptions options) throws Exception {
         String zipFilePath = options.parameters().get(DRIVER_ZIP_FILE_PATH_PARAM_NAME).get();
         URLClassLoader classLoader = getUrlClassLoader(zipFilePath);
         // 4. 加载驱动类
@@ -74,8 +72,7 @@ public class DriverUtils {
         return initializeDriver(options.url(), classLoader, driverClassName);
     }
 
-    public static Class<?> loadDriverClass(String className, CaseInsensitiveMap<String> parameters)
-            throws Exception {
+    public static Class<?> loadDriverClass(String className, CaseInsensitiveMap<String> parameters) throws Exception {
         String zipFilePath = parameters.get(DRIVER_ZIP_FILE_PATH_PARAM_NAME).get();
         URLClassLoader classLoader = getUrlClassLoader(zipFilePath);
         // 4. 加载驱动类
@@ -87,8 +84,8 @@ public class DriverUtils {
         if (monPluginFileValue == null || monPluginFileValue.isEmpty()) {
             throw new IllegalArgumentException(" file path cannot be null or empty");
         }
-        List<File> jarFiles = new ArrayList<>();
-        if (monPluginFileValue.endsWith(".zip")) {
+        List<File> jarFiles;
+        if (isAZip(monPluginFileValue)) {
             jarFiles = loadJarFilesFormZip(monPluginFileValue);
         } else {
             jarFiles = loadJarFilesFromFolder(monPluginFileValue);
@@ -105,10 +102,53 @@ public class DriverUtils {
         return classLoader;
     }
 
+    /**
+     * 判断给定的文件路径是否指向一个有效的zip文件。
+     * <p>
+     * 该函数会检查文件是否存在、是否为目录、是否为常规文件，并且文件扩展名是否为".zip"。
+     *
+     * @param monPluginFileValue 文件路径字符串，表示需要检查的文件
+     * @return 如果文件存在、是常规文件、不是目录，并且以".zip"结尾，则返回true；否则返回false
+     */
+    private static boolean isAZip(String monPluginFileValue) throws URISyntaxException {
+        String suffix = ".zip";
+        String cleanPath = monPluginFileValue.replaceFirst("^file:///", "");
+        java.nio.file.Path path = Paths.get(cleanPath);
+        boolean exists = Files.exists(path);
+        if (!exists) {
+            LOG.info("文件不存在:" + monPluginFileValue);
+            return false;
+        }
+        boolean directory = Files.isDirectory(path);
+        if (directory) {
+            LOG.info("文件是目录，不是zip文件:" + monPluginFileValue);
+            return false;
+        }
+        boolean regularFile = Files.isRegularFile(path);
+        if (!regularFile) {
+            LOG.info("文件不是常规文件，不是zip文件:" + monPluginFileValue);
+            return false;
+        }
+        boolean b = monPluginFileValue.endsWith(suffix);
+        if (!b) {
+            LOG.info("文件不是zip文件:" + monPluginFileValue);
+        }
+        return b;
+    }
 
+    /**
+     * 从指定的ZIP文件中加载JAR文件。
+     * 该函数首先验证ZIP文件路径的有效性，然后根据路径类型（本地文件或Spark分布式文件）获取ZIP文件的实际路径。
+     * 接着，创建一个临时目录用于解压ZIP文件，并返回解压后的文件列表。
+     *
+     * @param zipFileValue ZIP文件的路径或标识符，可以是本地文件路径或Spark分布式文件路径。
+     * @return 解压后的JAR文件列表。
+     * @throws URISyntaxException 如果ZIP文件路径的URI格式不正确。
+     * @throws IOException        如果ZIP文件无法找到或读取。
+     */
     private static List<File> loadJarFilesFormZip(String zipFileValue) throws URISyntaxException, IOException {
         // 1. 获取ZIP文件路径（基于网页5的Spark文件分发机制）
-        if (!zipFileValue.endsWith(".zip")) {
+        if (!isAZip(zipFileValue)) {
             throw new IllegalArgumentException("Invalid ZIP file name: " + zipFileValue);
         }
         String zipPath = null;
@@ -134,11 +174,9 @@ public class DriverUtils {
 
 
         LOG.info("meritdata mon ZIP file path: " + zipPath);
-        // 2. 创建临时解压目录（参考网页3的临时文件处理）
-
+        // 2. 创建临时解压目录
         File tempDir = crateTempoDirToSparkRootDir();
-        List<File> jarFiles = unzipFiles(zipPath, tempDir);
-        return jarFiles;
+        return unzipFiles(zipPath, tempDir);
     }
 
     @NotNull
@@ -150,7 +188,6 @@ public class DriverUtils {
 
     private static List<File> loadJarFilesFromFolder(String folderPath) throws IOException, URISyntaxException {
         // 1. 获取文件夹路径
-
         String jarFolderPath = null;
         if (folderPath.startsWith("file:///")) {
             if (!new File(folderPath).isDirectory()) {
@@ -182,9 +219,7 @@ public class DriverUtils {
         if (files == null || files.length == 0) {
             throw new FileNotFoundException("No JAR files found in folder: " + jarFolderPath);
         }
-
-        List<File> jarFiles = Arrays.asList(files);
-        return jarFiles;
+        return Arrays.asList(files);
     }
 
     private static String downloadFromHdfsToLocal(String hdfsFolderPath) throws FileNotFoundException {
@@ -245,11 +280,45 @@ public class DriverUtils {
 
 
     private static String getDriverClassName(String url) {
-        if (url.indexOf("mysql") != -1) {
-            return "com.mysql.cj.jdbc.Driver";
+        // 提取数据库类型
+        String dbType = extractDbTypeFromUrl(url);
+        if (dbType == null) {
+            LOG.warning("无法从URL中提取数据库类型: " + url);
+            return "";
         }
-        throw new RuntimeException("不支持的数据库类型");
+
+        // 从DBDriverTypes中获取驱动类名
+        DBDriverTypes driverType = DBDriverTypes.of(dbType.toLowerCase());
+        if (driverType == null) {
+            LOG.warning("不支持的数据库类型: " + dbType);
+            return "";
+        }
+
+        return driverType.getDriver();
     }
+
+    /**
+     * 从JDBC URL中提取数据库类型。
+     * <p>
+     * 该方法假设JDBC URL的格式为 "jdbc:dbtype://..." 或 "jdbc:dbtype:..."，
+     * 并从URL中提取出数据库类型（dbtype）。
+     *
+     * @param url JDBC连接URL，格式应为 "jdbc:dbtype://..." 或 "jdbc:dbtype:..."
+     * @return 提取出的数据库类型，转换为小写形式。如果URL格式不符合预期，则返回null。
+     */
+    private static String extractDbTypeFromUrl(String url) {
+        // 这里假设URL格式为 jdbc:dbtype://... 或 jdbc:dbtype:...
+        if (url.startsWith("jdbc:")) {
+            int start = 5; // 跳过 "jdbc:"
+            int end = url.indexOf(":", start); // 查找第一个冒号
+            if (end != -1) {
+                return url.substring(start, end).toLowerCase();
+            }
+        }
+        LOG.warning("URL格式不正确: " + url + "；应该为： \"jdbc:dbtype://...\" 或 \"jdbc:dbtype:...\" 。");
+        return null;
+    }
+
 
     // 解压ZIP文件到指定目录（基于网页3的解压逻辑优化）
     private static List<File> unzipFiles(String zipPath, File outputDir) throws IOException {
@@ -260,8 +329,7 @@ public class DriverUtils {
                     File outputFile = new File(outputDir, entry.getName());
                     if (!entry.isDirectory()) {
                         outputFile.getParentFile().mkdirs();
-                        try (InputStream is = zipFile.getInputStream(entry);
-                             OutputStream os = new FileOutputStream(outputFile)) {
+                        try (InputStream is = zipFile.getInputStream(entry); OutputStream os = new FileOutputStream(outputFile)) {
                             byte[] buffer = new byte[1024];
                             int len;
                             while ((len = is.read(buffer)) > 0) {
@@ -280,17 +348,15 @@ public class DriverUtils {
         return jarFiles;
     }
 
-    // 创建自定义类加载器（基于网页4的双亲委派机制重写）
+    // 创建自定义类加载器
     private static synchronized URLClassLoader createClassLoader(List<File> jarFiles) throws Exception {
-        URL[] urls = jarFiles.stream()
-                .map(f -> {
-                    try {
-                        return f.toURI().toURL();
-                    } catch (Exception e) {
-                        throw new RuntimeException(e);
-                    }
-                })
-                .toArray(URL[]::new);
+        URL[] urls = jarFiles.stream().map(f -> {
+            try {
+                return f.toURI().toURL();
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        }).toArray(URL[]::new);
 
         return new URLClassLoader(urls, null) { // 隔离父类加载器
             @Override
@@ -311,8 +377,7 @@ public class DriverUtils {
     }
 
     // 初始化驱动类（结合网页5的驱动加载策略）
-    private static Driver initializeDriver(String url, ClassLoader classLoader, String driverClassName)
-            throws Exception {
+    private static Driver initializeDriver(String url, ClassLoader classLoader, String driverClassName) throws Exception {
 
         Class<?> driverClass;
         if (driverClassName != null && !driverClassName.isEmpty()) {
@@ -346,16 +411,5 @@ public class DriverUtils {
             }
         }
         return DriverManager.getDrivers();
-    }
-
-    // 清理临时目录
-    private static void deleteDirectory(File dir) {
-        File[] files = dir.listFiles();
-        if (files != null) {
-            for (File f : files) {
-                deleteDirectory(f);
-            }
-        }
-        dir.delete();
     }
 }

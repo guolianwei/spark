@@ -66,21 +66,24 @@ object DriverRegistry extends Logging {
   }
 
   def register(className: String, parameters: CaseInsensitiveMap[String]): Unit = {
-    val zipFilePath = parameters.get(DriverUtils.DRIVER_ZIP_FILE_PATH_PARAM_NAME).get
+    val driverZipFilePathParamName = DriverUtils.DRIVER_ZIP_FILE_PATH_PARAM_NAME
+    val zipFilePath = parameters.get(driverZipFilePathParamName).get
     if (zipFilePath == null || zipFilePath.isEmpty) {
+      logInfo(s"$driverZipFilePathParamName 未找到，直接从spark classloader中加载。")
       register(className)
       return
     }
+    logInfo(s"$driverZipFilePathParamName 已找到，值为:$zipFilePath，使用专用类加载器加载。")
 
     val cls = DriverUtils.loadDriverClass(className, parameters)
     val wrapKey = className + zipFilePath
     if (cls.getClassLoader == null) {
       logTrace(s"$className has been loaded with bootstrap ClassLoader, wrapper is not required")
-    } else if (wrapperMap.get(wrapKey).isDefined) {
+    } else if (wrapperMap.contains(wrapKey)) {
       logTrace(s"Wrapper for $className already exists")
     } else {
       synchronized {
-        if (wrapperMap.get(wrapKey).isEmpty) {
+        if (!wrapperMap.contains(wrapKey)) {
           val wrapper = new DriverWrapper(cls.getConstructor().newInstance().asInstanceOf[Driver])
           DriverManager.registerDriver(wrapper)
           wrapperMap(wrapKey) = wrapper
