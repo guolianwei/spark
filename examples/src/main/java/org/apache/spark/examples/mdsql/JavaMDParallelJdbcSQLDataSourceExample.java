@@ -49,7 +49,10 @@ public class JavaMDParallelJdbcSQLDataSourceExample {
     static class JdbcConfigBuilder {
         // 带参数构造方法
         public static Map<String, String> buildJdbcOptions(String tableName) {
-            String driverPlugin1="hdfs://nn1:8020/user/hdfs/mon_plugins/mysql-8.0/";
+            //hdfsuserhome
+            String hdfsuserhome="/user/tempodata";
+            String driverPlugin1="hdfs://nn1:8020"+hdfsuserhome
+                    +"/mon_plugins/mysql-8.0/";
             Map<String, String> options = new HashMap<>();
             options.put("url", "jdbc:mysql://192.168.153.130:3306/hive");
             options.put("user", "root");

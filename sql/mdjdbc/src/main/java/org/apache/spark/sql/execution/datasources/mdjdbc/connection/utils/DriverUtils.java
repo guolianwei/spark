@@ -19,6 +19,7 @@ import java.sql.DriverManager;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.logging.Logger;
@@ -33,6 +34,7 @@ public class DriverUtils {
     public static final String DRIVER_ZIP_FILE_PATH_PARAM_NAME = "driver_plugins";
     public static final String MERITDATA_MON_SPARK_DRIVERS = "meritdata_mon_spark_drivers_";
     private static ConcurrentMap<String, URLClassLoader> classLoaderMap = new ConcurrentHashMap<>();
+    private static ConcurrentMap<String, String> pluginIdToPath = new ConcurrentHashMap<>();
 
     static {
         // 注册关闭钩子，避免进程停止时无法删除本地的临时jar文件。
@@ -62,6 +64,21 @@ public class DriverUtils {
         // 4. 加载驱动类
         String driverClassName = DriverUtils.getDriverClassName(url);
         return initializeDriver(url, classLoader, driverClassName);
+    }
+
+    public static Driver loadDriverFromPath(Properties properties, String pluginId) throws Exception {
+        String url = properties.getProperty("url");
+        String filePath = extractPathFrom(pluginId);
+        URLClassLoader classLoader = getUrlClassLoader(filePath);
+        // 4. 加载驱动类
+        String driverClassName = DriverUtils.getDriverClassName(url);
+        return initializeDriver(url, classLoader, driverClassName);
+    }
+
+    private static String extractPathFrom(String pluginId) {
+        //实现从本地的zip文件中解压出属性的映射的properties文件
+        //从properites文件中根据pluginId获取对应的驱动文件夹路径
+        return "";
     }
 
     public static Driver loadDriverFromPath(JDBCOptions options) throws Exception {
