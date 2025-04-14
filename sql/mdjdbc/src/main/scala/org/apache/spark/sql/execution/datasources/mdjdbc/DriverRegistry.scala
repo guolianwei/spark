@@ -66,7 +66,7 @@ object DriverRegistry extends Logging {
   }
 
   def register(className: String, parameters: CaseInsensitiveMap[String]): Unit = {
-    val driverZipFilePathParamName = DriverUtils.DRIVER_ZIP_FILE_PATH_PARAM_NAME
+    val driverZipFilePathParamName = DriverUtils.DRIVER_PLUGIN_ID
     val zipFilePath = parameters.get(driverZipFilePathParamName) match {
       case Some(path) => path
       case None =>

@@ -105,9 +105,7 @@ class JDBCOptions(
     // driver returned for a URL is different on the driver and executors due to classpath
     // differences.
     userSpecifiedDriverClass.getOrElse {
-      val zipFilePath = parameters.get(DriverUtils.DRIVER_ZIP_FILE_PATH_PARAM_NAME).get
-      DriverUtils.loadDriverFromPath(url,
-        zipFilePath).getClass.getCanonicalName
+      DriverUtils.loadDriverFromPath(parameters).getClass.getCanonicalName
     }
   }
 

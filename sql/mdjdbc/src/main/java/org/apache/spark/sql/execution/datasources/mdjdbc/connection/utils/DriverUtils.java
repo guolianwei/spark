@@ -2,7 +2,6 @@ package org.apache.spark.sql.execution.datasources.mdjdbc.connection.utils;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
-import org.apache.spark.SparkContext;
 import org.apache.spark.SparkFiles;
 import org.apache.spark.sql.catalyst.util.CaseInsensitiveMap;
 import org.apache.spark.sql.execution.datasources.mdjdbc.JDBCOptions;
@@ -19,7 +18,6 @@ import java.sql.DriverManager;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.logging.Logger;
@@ -31,8 +29,8 @@ import org.jetbrains.annotations.NotNull;
 
 public class DriverUtils {
     private static final Logger LOG = Logger.getLogger(DriverUtils.class.getName());
-    public static final String DRIVER_ZIP_FILE_PATH_PARAM_NAME = "driver_plugins";
     public static final String MERITDATA_MON_SPARK_DRIVERS = "meritdata_mon_spark_drivers_";
+    public static final String DRIVER_PLUGIN_ID = "driver_plugin_id";
     private static ConcurrentMap<String, URLClassLoader> classLoaderMap = new ConcurrentHashMap<>();
     private static ConcurrentMap<String, String> pluginIdToPath = new ConcurrentHashMap<>();
 
@@ -55,43 +53,49 @@ public class DriverUtils {
         }));
     }
 
-    // 其他方法保持不变...
 
-
-    //"com.mysql.cj.jdbc.Driver"
-    public static Driver loadDriverFromPath(String url, String filePath) throws Exception {
-        URLClassLoader classLoader = getUrlClassLoader(filePath);
+    public static Driver loadDriverFromPath(CaseInsensitiveMap<String> parameters) throws Exception {
+        String url = parameters.get("url").get();
+        URLClassLoader classLoader = getUrlClassLoader(parameters);
         // 4. 加载驱动类
         String driverClassName = DriverUtils.getDriverClassName(url);
         return initializeDriver(url, classLoader, driverClassName);
     }
 
-    public static Driver loadDriverFromPath(Properties properties, String pluginId) throws Exception {
-        String url = properties.getProperty("url");
-        String filePath = extractPathFrom(pluginId);
-        URLClassLoader classLoader = getUrlClassLoader(filePath);
-        // 4. 加载驱动类
-        String driverClassName = DriverUtils.getDriverClassName(url);
-        return initializeDriver(url, classLoader, driverClassName);
+
+    private static URLClassLoader getUrlClassLoader(CaseInsensitiveMap<String> parameters) throws Exception {
+        String driverId = parameters.get(DRIVER_PLUGIN_ID).get();
+        if (driverId == null || driverId.isEmpty()) {
+            LOG.warning("driver_plugin_id is null or empty");
+        }
+        String filePath = extractPathFromSparkFiles(driverId);
+        LOG.info("extractPathFromSparkFiles:" + filePath);
+        return getUrlClassLoader(filePath);
     }
 
-    private static String extractPathFrom(String pluginId) {
-        //实现从本地的zip文件中解压出属性的映射的properties文件
-        //从properites文件中根据pluginId获取对应的驱动文件夹路径
-        return "";
-    }
+    private static String extractPathFromSparkFiles(String driverId) throws IOException {
+        String property = System.getProperty("cloud.mon.plugins.home");
+        if (property != null && !property.isEmpty()) {
+            LOG.info("cloud.mon.plugins.home:" + property + " is not null,use it to load driver");
+            String s = property + File.separator + driverId + File.separator + driverId + ".zip";
+            LOG.info("loading file:" + s);
+            File file = new File(s);
+            if (file.exists()) {
+                LOG.info("file:" + s + " is exists,use it to load driver");
+                return s;
+            }
+        }
 
-    public static Driver loadDriverFromPath(JDBCOptions options) throws Exception {
-        String zipFilePath = options.parameters().get(DRIVER_ZIP_FILE_PATH_PARAM_NAME).get();
-        URLClassLoader classLoader = getUrlClassLoader(zipFilePath);
-        // 4. 加载驱动类
-        String driverClassName = DriverUtils.getDriverClassName(options.url());
-        return initializeDriver(options.url(), classLoader, driverClassName);
+        String s = SparkFiles.get(driverId + ".zip");
+        if (s != null) {
+            return s;
+        } else {
+            throw new IOException("driver_plugin_id:[" + driverId + "] is not found");
+        }
     }
 
     public static Class<?> loadDriverClass(String className, CaseInsensitiveMap<String> parameters) throws Exception {
-        String zipFilePath = parameters.get(DRIVER_ZIP_FILE_PATH_PARAM_NAME).get();
-        URLClassLoader classLoader = getUrlClassLoader(zipFilePath);
+        URLClassLoader classLoader = getUrlClassLoader(parameters);
         // 4. 加载驱动类
         return classLoader.loadClass(className);
     }
@@ -172,30 +176,11 @@ public class DriverUtils {
      * @throws IOException        如果ZIP文件无法找到或读取。
      */
     private static List<File> loadJarFilesFormZip(String zipFileValue) throws URISyntaxException, IOException {
-        // 1. 获取ZIP文件路径（基于网页5的Spark文件分发机制）
+        // 1. 获取ZIP文件路径
         if (!isALocalZip(zipFileValue)) {
             throw new IllegalArgumentException("Invalid ZIP file name: " + zipFileValue);
         }
-        String zipPath = null;
-        if (zipFileValue.startsWith("file:///")) {
-            java.nio.file.Path pathRaw = Paths.get(zipFileValue.replace("file:///", "")).normalize();
-            URI uri = new URI("file:///" + pathRaw.toString().replace("\\", "/"));
-            LOG.info("Method 2 URI: " + uri);
-            String path = uri.getPath();
-            LOG.info("从本地加载驱动:" + zipFileValue);
-            zipPath = path;
-            if (!new File(path).exists()) {
-                throw new FileNotFoundException("meritdata mon local ZIP file not found: " + zipPath);
-            }
-        } else {
-            LOG.info("未能从本地加载到驱动，从spark dist中加载");
-            //从zipFilePath中提取文件名称
-            String zipFileName = zipFileValue.substring(zipFileValue.lastIndexOf("/") + 1);
-            zipPath = SparkFiles.get(zipFileName);
-            if (zipPath == null) {
-                throw new FileNotFoundException("meritdata mon hdfs ZIP file not found: " + zipPath);
-            }
-        }
+        String zipPath = extra(zipFileValue);
 
 
         LOG.info("meritdata mon ZIP file path: " + zipPath);
@@ -205,6 +190,36 @@ public class DriverUtils {
     }
 
     @NotNull
+    private static String extra(String zipFileValue) throws URISyntaxException, FileNotFoundException {
+        if (new File(zipFileValue).exists()) {
+            return zipFileValue;
+        }
+
+        if (zipFileValue.startsWith("file:///")) {
+            java.nio.file.Path pathRaw = Paths.get(zipFileValue.replace("file:///", "")).normalize();
+            URI uri = new URI("file:///" + pathRaw.toString().replace("\\", "/"));
+            LOG.info("Method 2 URI: " + uri);
+            String path = uri.getPath();
+            LOG.info("从本地加载驱动:" + zipFileValue);
+            if (!new File(path).exists()) {
+                throw new FileNotFoundException("meritdata mon local ZIP file not found: "
+                        + path);
+            }
+            return path;
+        }
+
+
+        LOG.info("未能从本地加载到驱动，从spark dist中加载");
+        //从zipFilePath中提取文件名称
+        String zipFileName = zipFileValue.substring(zipFileValue.lastIndexOf("/") + 1);
+        String zipPath = SparkFiles.get(zipFileName);
+        if (zipPath == null) {
+            throw new FileNotFoundException("meritdata mon hdfs ZIP file not found: " + zipPath);
+        }
+        return zipPath;
+    }
+
+
     private static File crateTempoDirToSparkRootDir() throws IOException {
         String rootDirectory = SparkFiles.getRootDirectory();
         java.nio.file.Path path = Paths.get(rootDirectory);
@@ -247,9 +262,8 @@ public class DriverUtils {
         return Arrays.asList(files);
     }
 
-    private static String downloadFromHdfsToLocal(String hdfsFolderPath) throws FileNotFoundException {
-        SparkContext sc = SparkContext.getOrCreate();
-        Configuration configuration = sc.hadoopConfiguration();
+    private static String downloadFromHdfsToLocal(String hdfsFolderPath) throws IOException {
+        Configuration configuration = getHadoopConfigration();
         try {
             FileSystem fs = FileSystem.get(new URI(hdfsFolderPath), configuration);
             Path hdfsPath = new Path(hdfsFolderPath);
@@ -287,6 +301,10 @@ public class DriverUtils {
         } catch (Exception e) {
             throw new FileNotFoundException("Failed to download folder from HDFS: " + hdfsFolderPath);
         }
+    }
+
+    private static Configuration getHadoopConfigration() throws IOException {
+        return new Configuration();
     }
 
 
@@ -347,21 +365,42 @@ public class DriverUtils {
 
     // 解压ZIP文件到指定目录（基于网页3的解压逻辑优化）
     private static List<File> unzipFiles(String zipPath, File outputDir) throws IOException {
+        String fileFilter = "*";
+        return unzipFilesReturnByFilter(zipPath, outputDir, fileFilter);
+    }
+
+
+    private static List<File> unzipFilesReturnByFilter(String zipPath, File outputDir, String fileFilter) throws IOException {
+        if (fileFilter == null || fileFilter.isEmpty()) {
+            throw new IllegalArgumentException("fileFilter can not be null or empty");
+        }
+        LOG.info("meritdata 解压ZIP文件到指定目录 zipPath:" + zipPath + ", outputDir:" +
+                outputDir + " , fileFilter: " + fileFilter);
         List<File> jarFiles = new ArrayList<>();
         try (ZipFile zipFile = new ZipFile(zipPath)) {
             zipFile.stream().forEach(entry -> {
                 try {
                     File outputFile = new File(outputDir, entry.getName());
-                    if (!entry.isDirectory()) {
+
+                    // 新增：显式处理目录条目
+                    if (entry.isDirectory()) {
+                        outputFile.mkdirs();  // 创建目录
+                    } else {
+                        // 保留原逻辑：确保父目录存在并写入文件
                         outputFile.getParentFile().mkdirs();
-                        try (InputStream is = zipFile.getInputStream(entry); OutputStream os = new FileOutputStream(outputFile)) {
+                        try (InputStream is = zipFile.getInputStream(entry);
+                             OutputStream os = new FileOutputStream(outputFile)) {
                             byte[] buffer = new byte[1024];
                             int len;
                             while ((len = is.read(buffer)) > 0) {
                                 os.write(buffer, 0, len);
                             }
                         }
-                        if (outputFile.getName().endsWith(".jar")) {
+
+                        // 文件过滤逻辑保持不变
+                        if (fileFilter.equals("*")) {
+                            jarFiles.add(outputFile);
+                        } else if (outputFile.getName().endsWith(fileFilter)) {
                             jarFiles.add(outputFile);
                         }
                     }
@@ -423,18 +462,14 @@ public class DriverUtils {
     }
 
     public static java.util.Enumeration<Driver> getDrivers(JDBCOptions jdbcOptions) throws Exception {
-        String zipFilePath = jdbcOptions.parameters().get(DRIVER_ZIP_FILE_PATH_PARAM_NAME).get();
-        if (zipFilePath != null) {
-            LOG.info("meritdata::getDrivers:: 加载驱动器插件：" + zipFilePath);
-            URLClassLoader classLoader = getUrlClassLoader(zipFilePath);
-            ClassLoader originalLoader = Thread.currentThread().getContextClassLoader();
-            try {
-                Thread.currentThread().setContextClassLoader(classLoader);
-                return DriverManager.getDrivers();
-            } finally {
-                Thread.currentThread().setContextClassLoader(originalLoader);
-            }
+        URLClassLoader classLoader = getUrlClassLoader(jdbcOptions.parameters());
+        ClassLoader originalLoader = Thread.currentThread().getContextClassLoader();
+        try {
+            Thread.currentThread().setContextClassLoader(classLoader);
+            return DriverManager.getDrivers();
+        } finally {
+            Thread.currentThread().setContextClassLoader(originalLoader);
         }
-        return DriverManager.getDrivers();
+
     }
 }

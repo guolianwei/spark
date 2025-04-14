@@ -5,17 +5,23 @@ export HADOOP_CLASSPATH=$(hadoop classpath)
 export HADOOP_CONF_DIR=/opt/merit_cloud/file/cloud_mon/DEFAULT_CONFIG
 export JAVA_HOME=/root/jdk-21/
 export SPARK_HOME=/opt/spark-3.3.0-bin-hadoop3
-export SPARK_CONF_DIR=$SPARK_HOME/conf #
+export SPARK_CONF_DIR=$SPARK_HOME/conf
 
 # 路径定义（移除hdfs://前缀）
-local_pluingshome=${SPARK_HOME}/jdbcplugins/mysql-8.0
+local_pluingshome=/opt/merit_cloud/mon-plugins/third_env_plugin/mysql-8.0.29
+
+
 echo $local_pluingshome
 hdfs_userhome=/user/tempodata/
 echo $hdfs_userhome
 hdfs_spark_libpath=hdfs://${hdfs_userhome}/spark330/lib/jars
 echo $hdfs_spark_libpath
-hdfs_pluginsfilepath=${hdfs_userhome}/mon_plugins/mysql-8.0
+hdfs_pluginsfilepath=${hdfs_userhome}mon_plugins/mysql-8.0/
 echo $hdfs_pluginsfilepath
+# 本地所有配置文件的压缩包
+hdfs_plugin_zip_path=${hdfs_pluginsfilepath}mysql-8.0.29.zip
+echo $hdfs_plugin_zip_path
+
 examples_jar_name=spark-examples_2.12-3.3.5-SNAPSHOT-shaded.jar
 local_examples_jar_path=${SPARK_HOME}/examples/jars/${examples_jar_name}
 echo $local_examples_jar_path
@@ -38,6 +44,7 @@ ${SPARK_HOME}/bin/spark-submit \
 --master yarn \
 --deploy-mode cluster \
 --conf spark.yarn.jars=${hdfs_spark_libpath}/*.jar \
+--conf spark.yarn.dist.archives=${hdfs_plugin_zip_path}
 --num-executors 1 \
 --executor-memory 1G \
 --executor-cores 1 \

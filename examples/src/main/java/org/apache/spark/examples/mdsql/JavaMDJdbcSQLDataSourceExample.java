@@ -73,7 +73,7 @@ public class JavaMDJdbcSQLDataSourceExample {
       .option("dbtable", "hive.tbls")
       .option("user", "root")
       .option("password", "Root@123")
-      .option("driver_plugins", driverPlugin)
+            .option("driver_plugin_id", "mysql-8.0.29")
       .load();
     jdbcDF.show();
 
@@ -81,14 +81,13 @@ public class JavaMDJdbcSQLDataSourceExample {
     // 大数据集群模式下的路径：String driverPlugin1="hdfs://nn1:8020/user/hdfs/mon_plugins/mysql-8.0/";
     //本地模式传递路径：file:///user/hdfs/mon_plugins/mysql-8.0/
     //升级场景。
-    String driverPlugin1="file:///user/hdfs/mon_plugins/mysql-8.0/";
     Dataset<Row> jdbcDF1 = spark.read()
             .format("mdjdbc")
             .option("url", "jdbc:mysql://192.168.153.130:3306")
             .option("dbtable", "hive.tbls")
             .option("user", "root")
             .option("password", "Root@123")
-            .option("driver_plugin_id", "mysql-8.0")
+            .option("driver_plugin_id", "mysql-8.0.29")
             .load();
     jdbcDF1.show();
 
@@ -99,6 +98,5 @@ public class JavaMDJdbcSQLDataSourceExample {
     Dataset<Row> jdbcDF2 = spark.read().format("mdjdbc")
       .jdbc("jdbc:mysql:192.168.153.130:3306", "hive.tbls", connectionProperties);
     jdbcDF2.show();
-
   }
 }

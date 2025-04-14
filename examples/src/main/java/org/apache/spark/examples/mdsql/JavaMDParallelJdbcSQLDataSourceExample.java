@@ -59,7 +59,7 @@ public class JavaMDParallelJdbcSQLDataSourceExample {
             options.put("password", "Root@123");
             options.put("driver", "com.mysql.cj.jdbc.Driver");
             options.put("dbtable", tableName);  // 动态注入表名
-            options.put("driver_plugins", driverPlugin1);
+            options.put("driver_plugin_id", driverPlugin1);
             return options;
         }
     }
