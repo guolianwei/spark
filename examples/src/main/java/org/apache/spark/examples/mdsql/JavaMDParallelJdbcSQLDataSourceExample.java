@@ -29,46 +29,48 @@ import java.util.*;
 public class JavaMDParallelJdbcSQLDataSourceExample {
 
     public static void main(String[] args) {
-        System.out.println("开始并行加载过程。");
+        System.out.println("JavaMDParallelJdbcSQLDataSourceExample");
+        String mysqlhost = "192.168.153.130";
+        if (args.length == 1) {
+            mysqlhost = args[0];
+        }
+        System.out.println("mysqlhost:"+mysqlhost);
         SparkSession spark = SparkSession
                 .builder()
-                .appName("并行加载过程测试验证")
+                .appName("JavaMDParallelJdbcSQLDataSourceExample")
                 .getOrCreate();
-        runJdbcDatasetExample(spark);
+        runJdbcDatasetExample(spark,mysqlhost);
         spark.stop();
     }
 
-    private static void runJdbcDatasetExample(SparkSession spark) {
+    private static void runJdbcDatasetExample(SparkSession spark, String mysqlhost) {
         // 步骤1：生成测试数据
-        generateTestData(spark);
+        generateTestData(spark,mysqlhost);
         // 步骤2：执行并行加载与统计
-        parallelLoadAndStatistics(spark);
+        parallelLoadAndStatistics(spark,mysqlhost);
         spark.stop();
     }
 
     static class JdbcConfigBuilder {
         // 带参数构造方法
-        public static Map<String, String> buildJdbcOptions(String tableName) {
+        public static Map<String, String> buildJdbcOptions(String tableName, String mysqlhost) {
             //hdfsuserhome
-            String hdfsuserhome="/user/tempodata";
-            String driverPlugin1="hdfs://nn1:8020"+hdfsuserhome
-                    +"/mon_plugins/mysql-8.0/";
             Map<String, String> options = new HashMap<>();
-            options.put("url", "jdbc:mysql://192.168.153.130:3306/hive");
-            options.put("user", "root");
-            options.put("password", "Root@123");
+            options.put("url", "jdbc:mysql://" + mysqlhost + ":3306/hive");
+            options.put("user", "hive");
+            options.put("password", "Hive@1234");
             options.put("driver", "com.mysql.cj.jdbc.Driver");
             options.put("dbtable", tableName);  // 动态注入表名
-            options.put("driver_plugin_id", driverPlugin1);
+            options.put("driver_plugin_id", "mysql-8.0.29");
             return options;
         }
     }
 
-    public static void parallelLoadAndStatistics(SparkSession spark) {
+    public static void parallelLoadAndStatistics(SparkSession spark,String   mysqlhost) {
         // 并行加载配置
         Dataset<Row> jdbcDF = spark.read()
                 .format("mdjdbc")
-                .options(JdbcConfigBuilder.buildJdbcOptions("test_spark_driver_classloader_user_data"))
+                .options(JdbcConfigBuilder.buildJdbcOptions("test_spark_driver_classloader_user_data",mysqlhost))
                 .option("partitionColumn", "id")          // 分区字段
                 .option("lowerBound", 1)                  // 最小值
                 .option("upperBound", 1000)               // 最大值
@@ -96,12 +98,13 @@ public class JavaMDParallelJdbcSQLDataSourceExample {
     }
 
     // 生成测试数据并写入MySQL
-    public static void generateTestData(SparkSession spark) {
+    public static void generateTestData(SparkSession spark, String mysqlhost) {
         // 创建1000条测试数据
         List<Row> data = new ArrayList<>();
         for (int i = 1; i <= 1000; i++) {
             data.add(RowFactory.create(i, "user_" + i, (int) (Math.random() * 50 + 18)));
         }
+      System.out.println("生成1000条测试数据");
 
         // 创建带明确Schema的DataFrame
         StructType schema = new StructType(new StructField[]{
@@ -115,7 +118,8 @@ public class JavaMDParallelJdbcSQLDataSourceExample {
         // 写入MySQL
         df.write()
                 .format("mdjdbc")
-                .options(JdbcConfigBuilder.buildJdbcOptions("test_spark_driver_classloader_user_data"))
+                .options(JdbcConfigBuilder.buildJdbcOptions
+                        ("test_spark_driver_classloader_user_data",mysqlhost))
                 .mode("overwrite")
                 .save();
     }

@@ -85,13 +85,22 @@ public class DriverUtils {
                 return s;
             }
         }
-
-        String s = SparkFiles.get(driverId + ".zip");
+        String zipFileName = driverId + ".zip";
+        String s = SparkFiles.get(zipFileName);
         if (s != null) {
-            return s;
-        } else {
-            throw new IOException("driver_plugin_id:[" + driverId + "] is not found");
+            if (Files.exists(Paths.get(s))) {
+                return s;
+            } else {
+                LOG.info("can not load file from SparkFiles.get:" + s);
+            }
         }
+        URL resource = DriverUtils.class.getClassLoader().getResource(zipFileName);
+        if (resource != null) {
+            LOG.info("loading file from classLoader:" + resource.getPath());
+            return resource.getPath();
+        }
+        throw new IOException("Failed to find driver plugin file: " + zipFileName
+                + " by plugin id: " + zipFileName);
     }
 
     public static Class<?> loadDriverClass(String className, CaseInsensitiveMap<String> parameters) throws Exception {
@@ -108,7 +117,7 @@ public class DriverUtils {
         // 1. 判断缓存中是否已经存在该驱动类加载器
         URLClassLoader urlClassLoader = classLoaderMap.get(monPluginFileValue);
         if (urlClassLoader != null) {
-            LOG.info("使用已缓存的类加载器； key: " + monPluginFileValue);
+            LOG.info("Using the cached class loader, key: " + monPluginFileValue);
             return urlClassLoader;
         }
         //2. 判断文件路径是否为hdfs路径，如果是，则从hdfs下载zip文件到本地临时目录，并返回本地路径
@@ -121,7 +130,8 @@ public class DriverUtils {
         // 3. 构建自定义类加载器
         URLClassLoader classLoader = createClassLoader(jarFiles);
         classLoaderMap.put(monPluginFileValue, classLoader);
-        LOG.info("构建驱动类加载器,并写入缓存,key:" + monPluginFileValue);
+        LOG.info("Constructing the driver class loader and writing it to the cache,key:"
+                + monPluginFileValue);
         return classLoader;
     }
 
@@ -135,33 +145,40 @@ public class DriverUtils {
      */
     private static boolean isALocalZip(String monPluginFileValue) throws URISyntaxException {
         String suffix = ".zip";
+       /* try {
+            LOG.info("sleeping 100s");
+            Thread.sleep(100000);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }*/
         boolean b = monPluginFileValue.endsWith(suffix);
         if (!b) {
-            LOG.info("文件不是zip文件:" + monPluginFileValue);
+            LOG.info("The file is not a zip file:" + monPluginFileValue);
             return false;
         }
         if (monPluginFileValue.startsWith("hdfs://") || monPluginFileValue.startsWith("obs://")) {
-            LOG.info("文件不是本地文件:" + monPluginFileValue);
+            LOG.info("The file is not a local file:" + monPluginFileValue);
             return false;
         }
         String cleanPath = monPluginFileValue.replaceFirst("^file:///", "");
         java.nio.file.Path path = Paths.get(cleanPath);
         boolean exists = Files.exists(path);
         if (!exists) {
-            LOG.info("文件不存在:" + monPluginFileValue);
+            LOG.info("isALocalZip file does not exists:" + monPluginFileValue);
             return false;
         }
         boolean directory = Files.isDirectory(path);
         if (directory) {
-            LOG.info("文件是目录，不是zip文件:" + monPluginFileValue);
+            LOG.info("The file is a directory, not a zip file:" + monPluginFileValue);
             return false;
         }
         boolean regularFile = Files.isRegularFile(path);
         if (!regularFile) {
-            LOG.info("文件不是常规文件，不是zip文件:" + monPluginFileValue);
+            LOG.info("The file is not a regular file, not a zip file:" +
+                    monPluginFileValue);
             return false;
         }
-
+        LOG.info("The file is a zip file:" + monPluginFileValue);
         return b;
     }
 
@@ -374,7 +391,7 @@ public class DriverUtils {
         if (fileFilter == null || fileFilter.isEmpty()) {
             throw new IllegalArgumentException("fileFilter can not be null or empty");
         }
-        LOG.info("meritdata 解压ZIP文件到指定目录 zipPath:" + zipPath + ", outputDir:" +
+        LOG.info("meritdata 解压ZIP文件到指定目录 zipPath:" + zipPath + ",\n outputDir:" +
                 outputDir + " , fileFilter: " + fileFilter);
         List<File> jarFiles = new ArrayList<>();
         try (ZipFile zipFile = new ZipFile(zipPath)) {
@@ -399,6 +416,7 @@ public class DriverUtils {
 
                         // 文件过滤逻辑保持不变
                         if (fileFilter.equals("*")) {
+                            LOG.info("meritdata unzip file: " + outputFile.getAbsolutePath());
                             jarFiles.add(outputFile);
                         } else if (outputFile.getName().endsWith(fileFilter)) {
                             jarFiles.add(outputFile);

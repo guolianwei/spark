@@ -70,11 +70,11 @@ object DriverRegistry extends Logging {
     val zipFilePath = parameters.get(driverZipFilePathParamName) match {
       case Some(path) => path
       case None =>
-        logInfo(s"【$driverZipFilePathParamName】参数未找到，直接从spark classloader中加载。")
+        logInfo(s"【$driverZipFilePathParamName】not found, load from spark classloader.")
         register(className)
         return
     }
-    logInfo(s"【$driverZipFilePathParamName】 已找到，值为:$zipFilePath，使用专用类加载器加载。")
+    logInfo(s"[$driverZipFilePathParamName] has been found, value: $zipFilePath, loading with dedicated class loader.")
 
     val cls = DriverUtils.loadDriverClass(className, parameters)
     val wrapKey = className + zipFilePath

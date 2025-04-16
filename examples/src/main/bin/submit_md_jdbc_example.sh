@@ -19,7 +19,7 @@ echo $hdfs_spark_libpath
 hdfs_pluginsfilepath=${hdfs_userhome}mon_plugins/mysql-8.0/
 echo $hdfs_pluginsfilepath
 # 本地所有配置文件的压缩包
-hdfs_plugin_zip_path=${hdfs_pluginsfilepath}mysql-8.0.29.zip
+hdfs_plugin_zip_path=hdfs:///user/tempodata/mon_plugins/mysql-8.0/mysql-8.0.29.zip
 echo $hdfs_plugin_zip_path
 
 examples_jar_name=spark-examples_2.12-3.3.5-SNAPSHOT-shaded.jar
@@ -40,14 +40,22 @@ hadoop fs -put ${local_pluingshome}/* ${hdfs_pluginsfilepath}/
 echo "从 ${local_pluingshome}/* 到 ${hdfs_pluginsfilepath}/"
 hadoop fs -ls ${hdfs_spark_libpath}
 # 任务提交优化（调整资源参数）
-${SPARK_HOME}/bin/spark-submit \
+CMD="${SPARK_HOME}/bin/spark-submit \
 --master yarn \
 --deploy-mode cluster \
+--conf spark.driver.extraJavaOptions=-Dfile.encoding=UTF-8 \
+--conf spark.executor.extraJavaOptions=-Dfile.encoding=UTF-8 \
+--conf spark.hadoop.hive.metastore.client.charset=UTF-8 \
 --conf spark.yarn.jars=${hdfs_spark_libpath}/*.jar \
---conf spark.yarn.dist.archives=${hdfs_plugin_zip_path}
+--conf spark.yarn.dist.files=${hdfs_plugin_zip_path} \
 --num-executors 1 \
 --executor-memory 1G \
 --executor-cores 1 \
 --driver-memory 1G \
+--queue default \
 --class ${main_class_for_exec} \
-${local_examples_jar_path}
+${local_examples_jar_path} \
+nn1"
+
+echo $CMD
+$CMD
