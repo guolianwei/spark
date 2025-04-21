@@ -105,7 +105,7 @@ class JDBCOptions(
     // driver returned for a URL is different on the driver and executors due to classpath
     // differences.
     userSpecifiedDriverClass.getOrElse {
-      DriverUtils.loadDriverFromPath(parameters).getClass.getCanonicalName
+      DriverUtils.loadDriverFromParmeters(parameters).getClass.getCanonicalName
     }
   }
 

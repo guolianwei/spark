@@ -18,6 +18,7 @@ import java.sql.DriverManager;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.logging.Logger;
@@ -54,17 +55,32 @@ public class DriverUtils {
     }
 
 
-    public static Driver loadDriverFromPath(CaseInsensitiveMap<String> parameters) throws Exception {
+    public static Driver loadDriverFromParmeters(CaseInsensitiveMap<String> parameters) throws Exception {
         String url = parameters.get("url").get();
         URLClassLoader classLoader = getUrlClassLoader(parameters);
         // 4. 加载驱动类
         String driverClassName = DriverUtils.getDriverClassName(url);
         return initializeDriver(url, classLoader, driverClassName);
     }
-
+    public static Driver loadDriverFromProperties(Properties properties) throws Exception {
+        String url = (String) properties.get("url");
+        URLClassLoader classLoader = getUrlClassLoader(properties);
+        // 4. 加载驱动类
+        String driverClassName = DriverUtils.getDriverClassName(url);
+        return initializeDriver(url, classLoader, driverClassName);
+    }
 
     private static URLClassLoader getUrlClassLoader(CaseInsensitiveMap<String> parameters) throws Exception {
         String driverId = parameters.get(DRIVER_PLUGIN_ID).get();
+        if (driverId == null || driverId.isEmpty()) {
+            LOG.warning("driver_plugin_id is null or empty");
+        }
+        String filePath = extractPathFromSparkFiles(driverId);
+        LOG.info("extractPathFromSparkFiles:" + filePath);
+        return getUrlClassLoader(filePath);
+    }
+    private static URLClassLoader getUrlClassLoader(Properties parameters) throws Exception {
+        String driverId = (String) parameters.get(DRIVER_PLUGIN_ID);
         if (driverId == null || driverId.isEmpty()) {
             LOG.warning("driver_plugin_id is null or empty");
         }
