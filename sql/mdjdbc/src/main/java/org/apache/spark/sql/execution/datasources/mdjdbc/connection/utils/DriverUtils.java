@@ -456,7 +456,7 @@ public class DriverUtils {
             }
         }).toArray(URL[]::new);
 
-        return new URLClassLoader(urls, null) { // 隔离父类加载器
+        URLClassLoader classLoader=new URLClassLoader(urls, null) { // 隔离父类加载器
             @Override
             public Class<?> loadClass(String name) throws ClassNotFoundException {
                 synchronized (getClassLoadingLock(name)) {
@@ -471,7 +471,9 @@ public class DriverUtils {
                     return cls != null ? cls : super.loadClass(name);
                 }
             }
+
         };
+        return classLoader;
     }
 
     // 初始化驱动类（结合网页5的驱动加载策略）
