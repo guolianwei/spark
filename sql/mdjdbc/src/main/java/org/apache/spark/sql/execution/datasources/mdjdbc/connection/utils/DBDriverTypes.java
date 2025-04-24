@@ -123,16 +123,18 @@ public enum DBDriverTypes {
      * tidb
      */
     TIDB("tidb", "tidb", "com.mysql.cj.jdbc.Driver"),
+    /**
+     * tidb
+     */
+//    SQLITE("sqlite", "sqlite", "org.sqlite.JDBC"),
+    TERADATA("teradata", "teradata", "com.teradata.jdbc.TeraDriver"),
 
     /**
      * tidb
      */
-    SGRDB("sgrdb", "sgrdb", "com.mysql.cj.jdbc.Driver"),
+    SGRDB("sgrdb", "sgrdb", "com.mysql.cj.jdbc.Driver");
 
-    /**
-     * tidb
-     */
-    TERADATA("teradata", "teradata", "com.teradata.jdbc.TeraDriver");
+
 
     /**
      * 枚举值

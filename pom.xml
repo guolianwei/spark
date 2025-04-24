@@ -94,6 +94,7 @@
     <module>sql/mdjdbc</module>
     <module>assembly</module>
     <module>examples</module>
+    <module>mdjdbc-examples</module>
     <module>repl</module>
     <module>launcher</module>
     <module>external/kafka-0-10-token-provider</module>
@@ -102,7 +103,8 @@
     <module>external/kafka-0-10-sql</module>
     <module>external/avro</module>
       <module>javaparser</module>
-      <!-- See additional modules enabled by profiles below -->
+    <module>mdjdbc-examples/sqllite</module>
+    <!-- See additional modules enabled by profiles below -->
   </modules>
 
   <properties>

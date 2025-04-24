@@ -15,18 +15,18 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.sql.Driver;
 import java.sql.DriverManager;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Properties;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.zip.ZipFile;
 
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.jetbrains.annotations.NotNull;
+
+import javax.swing.plaf.synth.SynthTextAreaUI;
 
 public class DriverUtils {
     private static final Logger LOG = Logger.getLogger(DriverUtils.class.getName());
@@ -62,6 +62,7 @@ public class DriverUtils {
         String driverClassName = DriverUtils.getDriverClassName(url);
         return initializeDriver(url, classLoader, driverClassName);
     }
+
     public static Driver loadDriverFromProperties(Properties properties) throws Exception {
         String url = (String) properties.get("url");
         URLClassLoader classLoader = getUrlClassLoader(properties);
@@ -79,6 +80,7 @@ public class DriverUtils {
         LOG.info("extractPathFromSparkFiles:" + filePath);
         return getUrlClassLoader(filePath);
     }
+
     private static URLClassLoader getUrlClassLoader(Properties parameters) throws Exception {
         String driverId = (String) parameters.get(DRIVER_PLUGIN_ID);
         if (driverId == null || driverId.isEmpty()) {
@@ -99,7 +101,12 @@ public class DriverUtils {
             if (file.exists()) {
                 LOG.info("file:" + s + " is exists,use it to load driver");
                 return s;
+            } else {
+                LOG.info("file:" + s + " is not exists,use SparkFiles.get to load driver");
+                throw new IOException("Failed to find driver plugin file: " + s);
             }
+        } else {
+            LOG.info("cloud.mon.plugins.home is null or empty,use SparkFiles.get to load driver");
         }
         String zipFileName = driverId + ".zip";
         String s = SparkFiles.get(zipFileName);
@@ -366,7 +373,7 @@ public class DriverUtils {
         // 从DBDriverTypes中获取驱动类名
         DBDriverTypes driverType = DBDriverTypes.of(dbType.toLowerCase());
         if (driverType == null) {
-            LOG.warning("不支持的数据库类型: " + dbType);
+            LOG.warning("未内置驱动类的数据库类型: " + dbType);
             return "";
         }
 
@@ -456,7 +463,7 @@ public class DriverUtils {
             }
         }).toArray(URL[]::new);
 
-        URLClassLoader classLoader=new URLClassLoader(urls, null) { // 隔离父类加载器
+        URLClassLoader classLoader = new URLClassLoader(urls, null) { // 隔离父类加载器
             @Override
             public Class<?> loadClass(String name) throws ClassNotFoundException {
                 synchronized (getClassLoadingLock(name)) {
@@ -485,13 +492,20 @@ public class DriverUtils {
             driverClass = classLoader.loadClass(driverClassName);
         } else {
             // 自动探测驱动
-            ClassLoader originalLoader = Thread.currentThread().getContextClassLoader();
-            try {
-                Thread.currentThread().setContextClassLoader(classLoader);
-                return DriverManager.getDriver(url);
-            } finally {
-                Thread.currentThread().setContextClassLoader(originalLoader);
+            ServiceLoader<Driver> loadedDrivers = ServiceLoader.load(Driver.class, classLoader);
+            Iterator<Driver> driversIterator = loadedDrivers.iterator();
+            while (driversIterator.hasNext()) {
+                LOG.info("meritdata 加载驱动类 loading driver class：" + driversIterator.getClass().getName());
+                Driver driver = driversIterator.next(); // 触发驱动类初始化
+                boolean b = driver.acceptsURL(url);
+                if (b) {
+                    LOG.info("meritdata 加载驱动类 loading driver class：url：【" + url + "】 匹配成功，找到驱动类"
+                            + driver.getClass().getName());
+                    return driver;
+                }
             }
+            return DriverManager.getDriver(url);
+
         }
         // 实例化驱动类
         return (Driver) driverClass.getDeclaredConstructor().newInstance();
