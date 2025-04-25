@@ -5,7 +5,6 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.spark.SparkFiles;
 import org.apache.spark.sql.catalyst.util.CaseInsensitiveMap;
 import org.apache.spark.sql.execution.datasources.mdjdbc.JDBCOptions;
-import org.apache.spark.unsafe.Platform;
 
 import java.io.*;
 import java.net.URI;
@@ -19,16 +18,12 @@ import java.sql.DriverManager;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.zip.ZipFile;
 
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
-import javax.swing.plaf.synth.SynthTextAreaUI;
 
 public class DriverUtils {
     private static final Logger LOG = Logger.getLogger(DriverUtils.class.getName());
@@ -121,7 +116,7 @@ public class DriverUtils {
                 + " by plugin id: " + zipFileName);
     }
 
-    @Nullable
+
     private static String localMode(String driverId, String property) throws IOException {
         if (property != null && !property.isEmpty()) {
             LOG.info("cloud.mon.plugins.home:" + property + " is not null,use it to load driver");
@@ -244,7 +239,6 @@ public class DriverUtils {
         return unzipFiles(zipPath, tempDir);
     }
 
-    @NotNull
     private static String extra(String zipFileValue) throws URISyntaxException, FileNotFoundException {
         if (new File(zipFileValue).exists()) {
             return zipFileValue;
