@@ -5,6 +5,7 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.spark.SparkFiles;
 import org.apache.spark.sql.catalyst.util.CaseInsensitiveMap;
 import org.apache.spark.sql.execution.datasources.mdjdbc.JDBCOptions;
+import org.apache.spark.unsafe.Platform;
 
 import java.io.*;
 import java.net.URI;
@@ -25,6 +26,7 @@ import java.util.zip.ZipFile;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import javax.swing.plaf.synth.SynthTextAreaUI;
 
@@ -93,21 +95,14 @@ public class DriverUtils {
 
     private static String extractPathFromSparkFiles(String driverId) throws IOException {
         String property = System.getProperty("cloud.mon.plugins.home");
-        if (property != null && !property.isEmpty()) {
-            LOG.info("cloud.mon.plugins.home:" + property + " is not null,use it to load driver");
-            String s = property + File.separator + driverId + File.separator + driverId + ".zip";
-            LOG.info("loading file:" + s);
-            File file = new File(s);
-            if (file.exists()) {
-                LOG.info("file:" + s + " is exists,use it to load driver");
-                return s;
-            } else {
-                LOG.info("file:" + s + " is not exists,use SparkFiles.get to load driver");
-                throw new IOException("Failed to find driver plugin file: " + s);
-            }
-        } else {
-            LOG.info("cloud.mon.plugins.home is null or empty,use SparkFiles.get to load driver");
-        }
+        //如果是本地模式直接返回目录
+        String s1 = localMode(driverId, property);
+        if (s1 != null) return s1;
+
+        return yarnMode(driverId);
+    }
+
+    private static String yarnMode(String driverId) throws IOException {
         String zipFileName = driverId + ".zip";
         String s = SparkFiles.get(zipFileName);
         if (s != null) {
@@ -124,6 +119,26 @@ public class DriverUtils {
         }
         throw new IOException("Failed to find driver plugin file: " + zipFileName
                 + " by plugin id: " + zipFileName);
+    }
+
+    @Nullable
+    private static String localMode(String driverId, String property) throws IOException {
+        if (property != null && !property.isEmpty()) {
+            LOG.info("cloud.mon.plugins.home:" + property + " is not null,use it to load driver");
+            String s = property + File.separator + driverId;
+            LOG.info("loading file:" + s);
+            File file = new File(s);
+            if (file.exists()) {
+                LOG.info("file:" + s + " is exists,use it to load driver");
+                return s;
+            } else {
+                LOG.info("file:" + s + " is not exists,use SparkFiles.get to load driver");
+                throw new IOException("Failed to find driver plugin file: " + s);
+            }
+        } else {
+            LOG.info("cloud.mon.plugins.home is null or empty,use SparkFiles.get to load driver");
+        }
+        return null;
     }
 
     public static Class<?> loadDriverClass(String className, CaseInsensitiveMap<String> parameters) throws Exception {
@@ -267,28 +282,7 @@ public class DriverUtils {
     }
 
     private static List<File> loadJarFilesFromFolder(String folderPath) throws IOException, URISyntaxException {
-        // 1. 获取文件夹路径
-        String jarFolderPath = null;
-        if (folderPath.startsWith("file:///")) {
-            if (!new File(folderPath).isDirectory()) {
-                throw new IllegalArgumentException("Invalid folder path: " + folderPath);
-            }
-            jarFolderPath = getJarFolderPathFroFilePrefix(folderPath);
-        } else if (folderPath.startsWith("/")) {
-            if (!new File(folderPath).isDirectory()) {
-                throw new IllegalArgumentException("Invalid folder path: " + folderPath);
-            }
-            jarFolderPath = folderPath;
-            if (!new File(folderPath).exists()) {
-                throw new FileNotFoundException("meritdata mon hdfs ZIP file not found: " + jarFolderPath);
-            }
-        } else if (folderPath.startsWith("hdfs://") || folderPath.startsWith("obs://")) {
-            //从hdfs下载到本地
-            LOG.info("hdfs 或者 obs协议，从文件夹加载驱动: " + folderPath);
-            jarFolderPath = downloadFromHdfsToLocal(folderPath);
-        } else {
-            throw new IllegalArgumentException("不支持的文件协议: " + folderPath);
-        }
+        String jarFolderPath = dealFolder(folderPath);
 
         LOG.info("从文件夹加载驱动: " + jarFolderPath);
 
@@ -301,6 +295,31 @@ public class DriverUtils {
         }
         return Arrays.asList(files);
     }
+
+    private static String dealFolder(String folderPath) throws URISyntaxException, IOException {
+        // 1. 获取文件夹路径
+        String jarFolderPath = null;
+        if (folderPath.startsWith("file:///")) {
+            if (!new File(folderPath).isDirectory()) {
+                throw new IllegalArgumentException("Invalid folder path: " + folderPath);
+            }
+            return getJarFolderPathFroFilePrefix(folderPath);
+        }
+
+        if (folderPath.startsWith("hdfs://") || folderPath.startsWith("obs://")) {
+            //从hdfs下载到本地
+            LOG.info("hdfs 或者 obs协议，从文件夹加载驱动: " + folderPath);
+            return downloadFromHdfsToLocal(folderPath);
+        }
+
+        if (new File(folderPath).exists() && new File(folderPath).isDirectory()) {
+            LOG.info("是本地文件夹，从文件夹加载驱动: " + folderPath);
+            return folderPath;
+        }
+
+        throw new IllegalArgumentException("不支持的文件协议: " + folderPath);
+    }
+
 
     private static String downloadFromHdfsToLocal(String hdfsFolderPath) throws IOException {
         Configuration configuration = getHadoopConfigration();

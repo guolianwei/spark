@@ -6,7 +6,7 @@ import org.apache.spark.sql.execution.datasources.mdjdbc.connection.utils.Driver
 import java.sql.*;
 import java.util.Properties;
 
-public class JavaSQLiteExample {
+public class JavaSQLiteSimpleExample {
     public static void main(String[] args) throws Exception {
         SparkSession spark = SparkSession
                 .builder()
