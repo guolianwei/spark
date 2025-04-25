@@ -51,9 +51,16 @@ public enum DBDriverTypes {
      */
     MONGODB("mongodb", "mongodb", ""),
     /**
-     * 人大金仓
+     * 人大金仓 8.2 8.3 8.6 8.6(86)
      */
     KINGBASE("人大金仓", "kingbase", "meritdata.com.kingbase8.Driver"),
+
+    KINGASE83("人大金仓", "kingbase83", "com.kingbase83.Driver"),
+
+    KINGASE8("人大金仓", "kingbase8", "com.kingbase8.Driver"),
+    KINGASE86("人大金仓", "kingbase86", "com.kingbase86.Driver"),
+
+
     /**
      * Greenplum
      */
@@ -123,18 +130,16 @@ public enum DBDriverTypes {
      * tidb
      */
     TIDB("tidb", "tidb", "com.mysql.cj.jdbc.Driver"),
-    /**
-     * tidb
-     */
-//    SQLITE("sqlite", "sqlite", "org.sqlite.JDBC"),
-    TERADATA("teradata", "teradata", "com.teradata.jdbc.TeraDriver"),
 
     /**
      * tidb
      */
-    SGRDB("sgrdb", "sgrdb", "com.mysql.cj.jdbc.Driver");
+    SGRDB("sgrdb", "sgrdb", "com.mysql.cj.jdbc.Driver"),
 
-
+    /**
+     * tidb
+     */
+    TERADATA("teradata", "teradata", "com.teradata.jdbc.TeraDriver");
 
     /**
      * 枚举值
