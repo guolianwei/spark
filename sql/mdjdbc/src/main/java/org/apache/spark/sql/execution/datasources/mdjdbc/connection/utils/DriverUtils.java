@@ -29,8 +29,7 @@ public class DriverUtils {
     private static final Logger LOG = Logger.getLogger(DriverUtils.class.getName());
     public static final String MERITDATA_MON_SPARK_DRIVERS = "meritdata_mon_spark_drivers_";
     public static final String DRIVER_PLUGIN_ID = "driver_plugin_id";
-    private static ConcurrentMap<String, URLClassLoader> classLoaderMap = new ConcurrentHashMap<>();
-    private static ConcurrentMap<String, String> pluginIdToPath = new ConcurrentHashMap<>();
+    private static final ConcurrentMap<String, URLClassLoader> classLoaderMap = new ConcurrentHashMap<>();
 
     static {
         // 注册关闭钩子，避免进程停止时无法删除本地的临时jar文件。
@@ -39,7 +38,7 @@ public class DriverUtils {
             classLoaderMap.forEach((key, classLoader) -> {
                 try {
                     // 关闭类加载器
-                    if (classLoader instanceof Closeable) {
+                    if (classLoader != null) {
                         ((Closeable) classLoader).close();
                     }
                 } catch (Exception e) {
@@ -176,7 +175,7 @@ public class DriverUtils {
      * @param monPluginFileValue 文件路径字符串，表示需要检查的文件
      * @return 如果文件存在、是常规文件、不是目录，并且以".zip"结尾，则返回true；否则返回false
      */
-    private static boolean isALocalZip(String monPluginFileValue) throws URISyntaxException {
+    private static boolean isALocalZip(String monPluginFileValue) {
         String suffix = ".zip";
        /* try {
             LOG.info("sleeping 100s");
@@ -292,7 +291,6 @@ public class DriverUtils {
 
     private static String dealFolder(String folderPath) throws URISyntaxException, IOException {
         // 1. 获取文件夹路径
-        String jarFolderPath = null;
         if (folderPath.startsWith("file:///")) {
             if (!new File(folderPath).isDirectory()) {
                 throw new IllegalArgumentException("Invalid folder path: " + folderPath);
@@ -356,7 +354,7 @@ public class DriverUtils {
         }
     }
 
-    private static Configuration getHadoopConfigration() throws IOException {
+    private static Configuration getHadoopConfigration()  {
         return new Configuration();
     }
 
@@ -437,12 +435,18 @@ public class DriverUtils {
 
                     // 新增：显式处理目录条目
                     if (entry.isDirectory()) {
-                        outputFile.mkdirs();  // 创建目录
+                        boolean mkdirs = outputFile.mkdirs();// 创建目录
+                        if (!mkdirs) {
+                            LOG.info("1.mkdirs fail: " + outputFile.getAbsolutePath());
+                        }
                     } else {
                         // 保留原逻辑：确保父目录存在并写入文件
-                        outputFile.getParentFile().mkdirs();
+                        boolean mkdirs = outputFile.getParentFile().mkdirs();
+                        if(!mkdirs){
+                            LOG.info("2.mkdirs fail: " + outputFile.getParentFile().getAbsolutePath());
+                        }
                         try (InputStream is = zipFile.getInputStream(entry);
-                             OutputStream os = new FileOutputStream(outputFile)) {
+                             OutputStream os = Files.newOutputStream(outputFile.toPath())) {
                             byte[] buffer = new byte[1024];
                             int len;
                             while ((len = is.read(buffer)) > 0) {
@@ -467,7 +471,7 @@ public class DriverUtils {
     }
 
     // 创建自定义类加载器
-    private static synchronized URLClassLoader createClassLoader(List<File> jarFiles) throws Exception {
+    private static synchronized URLClassLoader createClassLoader(List<File> jarFiles)  {
         URL[] urls = jarFiles.stream().map(f -> {
             try {
                 return f.toURI().toURL();
@@ -476,7 +480,7 @@ public class DriverUtils {
             }
         }).toArray(URL[]::new);
 
-        URLClassLoader classLoader = new URLClassLoader(urls, null) { // 隔离父类加载器
+        return new URLClassLoader(urls, null) { // 隔离父类加载器
             @Override
             public Class<?> loadClass(String name) throws ClassNotFoundException {
                 synchronized (getClassLoadingLock(name)) {
@@ -493,7 +497,6 @@ public class DriverUtils {
             }
 
         };
-        return classLoader;
     }
 
     // 初始化驱动类（结合网页5的驱动加载策略）
