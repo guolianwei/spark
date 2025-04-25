@@ -211,7 +211,7 @@ public class DriverUtils {
             return false;
         }
         LOG.info("The file is a zip file:" + monPluginFileValue);
-        return b;
+        return true;
     }
 
     /**
